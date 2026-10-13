@@ -1,5 +1,9 @@
 # Software Intake Gatekeeper
 
+[![CI](https://github.com/Sushant-Nemade/software-intake-gatekeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/Sushant-Nemade/software-intake-gatekeeper/actions/workflows/ci.yml)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Software%20Intake%20Gatekeeper-blue?logo=github)](https://github.com/marketplace/actions/software-intake-gatekeeper)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 **Before you install, approve or ship a third-party app, find out what is inside it.**
 
 Software Intake Gatekeeper reads an installed application, an Electron `.asar` archive or a
@@ -150,23 +154,76 @@ Expired or unused waivers are reported.
 
 ## GitHub Action
 
+Available on the [GitHub Marketplace](https://github.com/marketplace/actions/software-intake-gatekeeper).
+It runs on Linux, Windows and macOS runners; CI exercises all three.
+
+### Gate a packaged Electron app and publish alerts to code scanning
+
 ```yaml
-- uses: Sushant-Nemade/software-intake-gatekeeper@<commit-sha>
-  id: intake
-  with:
-    path: dist/win-unpacked        # your packaged app
-    osv: "true"
-    fail-on: reject
-- uses: github/codeql-action/upload-sarif@<commit-sha>
-  if: always()
-  with:
-    sarif_file: ${{ steps.intake.outputs.sarif }}
+name: Intake gate
+on: [pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+  security-events: write   # only needed for the SARIF upload step
+
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # ... build or download the app you want to check into dist/linux-unpacked ...
+      - name: Software Intake Gatekeeper
+        id: intake
+        uses: Sushant-Nemade/software-intake-gatekeeper@v0
+        with:
+          path: dist/linux-unpacked
+          fail-on: reject
+      - name: Upload SARIF
+        if: always() && steps.intake.outputs.sarif != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.intake.outputs.sarif }}
+          category: software-intake-gatekeeper
+      - name: Keep the SBOM and evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: intake-gatekeeper-reports
+          path: intake-gatekeeper-reports/
 ```
 
-The action installs hash-pinned dependencies into a private virtual environment, runs the scan and
-appends the Markdown summary to the job summary. It exposes `decision`, `sarif` and `sbom` outputs.
-Inputs are passed through environment variables and are never interpolated into shell code.
-This repository's own CI uses the action on the demo target with live OSV and asserts the result.
+For supply-chain hardening, pin the action to the full commit SHA of a release instead of `@v0`.
+
+### Inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `path` | (required) | Installed app directory, `.asar` archive or executable to scan. |
+| `osv` | `true` | Look up known vulnerabilities on OSV.dev. Sends only ecosystem, name and version. Set `false` for fully offline runs. |
+| `policy` | `""` | Path to a policy TOML file (see [examples/intake-policy.toml](examples/intake-policy.toml)). |
+| `fail-on` | `reject` | Decision that fails the step: `reject`, `review` or `never`. |
+| `output-dir` | `intake-gatekeeper-reports` | Where `report.json`, `report.sarif`, `sbom.cdx.json` and `summary.md` are written. |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `decision` | `approve`, `review` or `reject` (`error` if no report was produced). |
+| `sarif` | Path to the SARIF 2.1.0 report. Paths inside it are relative to the workspace so code scanning can link them. |
+| `sbom` | Path to the CycloneDX 1.6 SBOM. |
+
+The Markdown summary is appended to the job summary. The action installs hash-pinned
+dependencies into a private virtual environment under `RUNNER_TEMP`, so it does not change the
+job's Python. Inputs reach the script only through environment variables and are never
+interpolated into shell code. No token or secret is required.
+
+### Versioning
+
+Releases follow [Semantic Versioning](https://semver.org/) and are listed in [CHANGELOG.md](CHANGELOG.md).
+`v0` always points to the latest `v0.x.y` release. Release artifacts carry
+[build provenance attestations](https://github.com/Sushant-Nemade/software-intake-gatekeeper/attestations)
+and a `SHA256SUMS` file.
 
 ## Privacy and network use
 
@@ -189,7 +246,7 @@ This repository's own CI uses the action on the demo target with live OSV and as
 | Output formats | CycloneDX validated with `cyclonedx-python-lib` against the 1.6 schema in tests. SARIF validated against the OASIS 2.1.0 schema during development |
 | OSV client | Mocked transport tests (batching, pagination, retries, alias grouping, withdrawn advisories) plus an opt-in live test (`INTAKE_LIVE_OSV=1`) |
 | Scale | Read-only scan of a locally installed VS Code: 3,243 files and 5,451 archive entries in about 19 s with a warm file cache |
-| CI | Ubuntu (Python 3.11 and 3.13) and Windows (3.13): pytest, ruff, mypy `--strict`, build, twine, pip-audit and an action dogfood job |
+| CI | Ubuntu (Python 3.11 and 3.13) and Windows (3.13): pytest, ruff, mypy `--strict`, build, twine, pip-audit. The action itself runs on Ubuntu, Windows and macOS against the demo with live OSV, plus fail-on and invalid-input checks |
 
 No third-party application files are committed. The local real-app checks are listed for
 transparency only.

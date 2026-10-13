@@ -7,7 +7,7 @@ from pathlib import Path
 
 from intake_gatekeeper import __version__, output
 from intake_gatekeeper.engine import run_scan
-from intake_gatekeeper.model import Decision, GatekeeperError, clean_text
+from intake_gatekeeper.model import Decision, GatekeeperError, Report, clean_text
 from intake_gatekeeper.osv import DEFAULT_URL, OsvClient, validate_base_url
 from intake_gatekeeper.policy import load_policy
 from intake_gatekeeper.rules import RULES
@@ -45,7 +45,13 @@ def _parser() -> argparse.ArgumentParser:
     )
     scan.add_argument("--policy", type=Path, help="policy TOML file")
     scan.add_argument("--json", type=Path, metavar="FILE", help="write the full JSON report")
-    scan.add_argument("--sarif", type=Path, metavar="FILE", help="write SARIF 2.1.0")
+    scan.add_argument(
+        "--sarif",
+        type=Path,
+        metavar="FILE",
+        help="write SARIF 2.1.0 (paths are relative to the current directory when the target "
+        "is inside it, which is what GitHub code scanning expects)",
+    )
     scan.add_argument("--cyclonedx", type=Path, metavar="FILE", help="write a CycloneDX 1.6 SBOM")
     scan.add_argument("--markdown", type=Path, metavar="FILE", help="write a Markdown summary")
     scan.add_argument(
@@ -88,9 +94,10 @@ def main(
         finally:
             if osv is not None:
                 osv.close()
-        writers = (
+        sarif_prefix = output.sarif_prefix(args.target, Path.cwd())
+        writers: tuple[tuple[Path | None, Callable[[Report], str]], ...] = (
             (args.json, output.to_json),
-            (args.sarif, output.to_sarif),
+            (args.sarif, lambda report: output.to_sarif(report, sarif_prefix)),
             (args.cyclonedx, output.to_cyclonedx),
             (args.markdown, output.to_markdown),
         )

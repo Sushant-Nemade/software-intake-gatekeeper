@@ -66,16 +66,26 @@ jobs:
 
   dogfood:
     needs: verify
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: "1.27.2"
           cache-dependency-path: examples/go-demo/go.sum
       - name: Build demo binaries
-        run: python3 scripts/build_demo.py
+        run: python scripts/build_demo.py
       - name: Scan the fictional vulnerable demo with the action (live OSV)
         id: gate
         uses: ./
@@ -86,11 +96,12 @@ jobs:
         env:
           DECISION: ${{ steps.gate.outputs.decision }}
           REPORT: intake-gatekeeper-reports/report.json
+          SARIF: ${{ steps.gate.outputs.sarif }}
         run: |
           test "$DECISION" = "reject"
-          python3 - <<'EOF'
+          python - <<'EOF'
           import json, os
-          report = json.load(open(os.environ["REPORT"]))
+          report = json.load(open(os.environ["REPORT"], encoding="utf-8"))
           ids = {f["rule_id"] for f in report["findings"]}
           expected = {"GHSA-69ch-w2m2-3vjp", "GHSA-5crp-9r3c-p9vr", "GHSA-xvch-5gv4-984h",
                       "EGK-JS-NODE-INTEGRATION", "EGK-FUSE-RUN-AS-NODE"}
@@ -98,10 +109,39 @@ jobs:
           assert not missing, missing
           blocking = [g for g in report["coverage_gaps"] if g["blocking"]]
           assert not blocking, blocking
+          sarif = json.load(open(os.environ["SARIF"], encoding="utf-8"))
+          uris = {r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+                  for r in sarif["runs"][0]["results"]}
+          assert all(u.startswith("examples/vulnerable-demo/") for u in uris), uris
           print(report["summary"])
           EOF
+      - name: Gate fails the step when the decision meets fail-on
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          path: examples/vulnerable-demo
+          osv: "false"
+          output-dir: strict-reports
+      - name: Invalid input is rejected
+        id: invalid
+        continue-on-error: true
+        uses: ./
+        with:
+          path: examples/vulnerable-demo
+          osv: "yes"
+          output-dir: invalid-reports
+      - name: Expect failures from the strict and invalid runs
+        env:
+          STRICT: ${{ steps.strict.outcome }}
+          STRICT_DECISION: ${{ steps.strict.outputs.decision }}
+          INVALID: ${{ steps.invalid.outcome }}
+        run: |
+          test "$STRICT" = "failure"
+          test "$STRICT_DECISION" = "reject"
+          test "$INVALID" = "failure"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: demo-intake-reports
+          name: demo-intake-reports-${{ matrix.os }}
           path: intake-gatekeeper-reports/
           retention-days: 14

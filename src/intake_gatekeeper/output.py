@@ -236,7 +236,18 @@ def _sarif_uri(path: str) -> str:
     return quote(path, safe="/!._-~@+")
 
 
-def to_sarif(report: Report) -> str:
+def sarif_prefix(target: Path, cwd: Path) -> str:
+    """Prefix that makes target-relative paths relative to cwd, or '' if target is outside it."""
+    resolved = target.resolve()
+    base = resolved if resolved.is_dir() else resolved.parent
+    try:
+        relative = base.relative_to(cwd.resolve()).as_posix()
+    except ValueError:
+        return ""
+    return "" if relative == "." else relative + "/"
+
+
+def to_sarif(report: Report, uri_prefix: str = "") -> str:
     rules: list[dict[str, Any]] = []
     indexes: dict[str, int] = {}
     results: list[dict[str, Any]] = []
@@ -267,7 +278,9 @@ def to_sarif(report: Report) -> str:
             rules.append(descriptor)
         location = finding.location
         physical: dict[str, Any] = {
-            "artifactLocation": {"uri": _sarif_uri(location.path if location else ".")}
+            "artifactLocation": {
+                "uri": _sarif_uri(uri_prefix + (location.path if location else "."))
+            }
         }
         if location is not None and location.line is not None:
             region: dict[str, Any] = {"startLine": location.line}

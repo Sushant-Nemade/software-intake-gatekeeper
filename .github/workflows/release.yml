@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: examples/go-demo/go.sum
+      - name: Tag must match the package version and be on main
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          test "$TAG" = "v$version" || { echo "::error::tag $TAG does not match version $version"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::tag is not on main"; exit 1; }
+      - name: Install uv
+        run: python -m pip install uv==0.13.0
+      - name: Test
+        env:
+          INTAKE_REQUIRE_GO_FIXTURES: "1"
+        run: |
+          uv sync --frozen --extra dev --python 3.13
+          uv run --frozen --extra dev pytest -q
+      - name: Build distributions
+        run: |
+          uv run --frozen --extra dev python -m build
+          uv run --frozen --extra dev twine check dist/*
+          (cd dist && sha256sum * > SHA256SUMS)
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        with:
+          subject-path: dist/*
+      - name: Extract release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          awk -v tag="## [${TAG#v}]" 'index($0, tag) == 1 {found=1; next} found && /^## \[/ {exit} found && /^\[[^]]+\]: / {next} found {print}' \
+            CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          test -s "$RUNNER_TEMP/notes.md" || { echo "::error::CHANGELOG.md has no section for $TAG"; exit 1; }
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --title "Software Intake Gatekeeper $TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag
+      - name: Move the major version tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          major="${TAG%%.*}"
+          git tag -f "$major" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$major"

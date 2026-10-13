@@ -60,6 +60,7 @@ include = [
     "action.yml",
     "action-requirements.txt",
     "README.md",
+    "CHANGELOG.md",
     "SECURITY.md",
     "LICENSE",
 ]

@@ -49,6 +49,35 @@ def test_fail_on(demo_target: Path, fail_on: str, expected: int) -> None:
     assert cli.main(["scan", str(demo_target), "--fail-on", fail_on, "-q"]) == expected
 
 
+def test_sarif_paths_are_relative_to_working_directory(
+    demo_target: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(demo_target.parent)
+    sarif = tmp_path / "r.sarif"
+    cli.main(["scan", demo_target.name, "--sarif", str(sarif), "--fail-on", "never", "-q"])
+    uris = {
+        result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        for result in json.loads(sarif.read_text(encoding="utf-8"))["runs"][0]["results"]
+    }
+    assert "demo/resources/app.asar!/main.js" in uris
+    assert all(uri.startswith("demo/") for uri in uris)
+
+
+def test_sarif_paths_stay_target_relative_outside_working_directory(
+    demo_target: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    sarif = tmp_path / "r.sarif"
+    asar = demo_target / "resources" / "app.asar"
+    cli.main(["scan", str(asar), "--sarif", str(sarif), "--fail-on", "never", "-q"])
+    results = json.loads(sarif.read_text(encoding="utf-8"))["runs"][0]["results"]
+    assert {r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] for r in results} >= {
+        "app.asar!/main.js"
+    }
+
+
 def test_lookup_disabled_cannot_approve(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     (tmp_path / "App.deps.json").write_text(
         json.dumps({"libraries": {"Serilog/2.10.0": {"type": "package"}}}), encoding="utf-8"

@@ -1,5 +1,5 @@
 name: Software Intake Gatekeeper
-description: Evidence-first intake checks for third-party apps and binaries - SBOM, OSV known vulnerabilities and Electron hardening.
+description: "Read-only intake gate for apps and binaries: CycloneDX SBOM, OSV vulnerabilities, Electron hardening and SARIF."
 author: Sushant Nemade
 branding:
   icon: shield
@@ -54,6 +54,10 @@ runs:
         OUTPUT_DIR: ${{ inputs.output-dir }}
       run: |
         set -u
+        case "$INPUT_OSV" in
+          true|false) ;;
+          *) echo "::error title=Software Intake Gatekeeper::input 'osv' must be 'true' or 'false'"; exit 2 ;;
+        esac
         venv="$RUNNER_TEMP/intake-gatekeeper-venv"
         "$PYTHON" -m venv "$venv"
         if [ -x "$venv/bin/python" ]; then py="$venv/bin/python"; else py="$venv/Scripts/python.exe"; fi
