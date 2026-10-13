@@ -1,0 +1,8 @@
+{
+  "name": "intake-demo-app",
+  "productName": "Intake Demo App",
+  "version": "1.0.0",
+  "description": "Deliberately insecure fictional Electron app used as a scanner fixture. Not a real product.",
+  "main": "main.js",
+  "private": true
+}

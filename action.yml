@@ -1,0 +1,80 @@
+name: Software Intake Gatekeeper
+description: Evidence-first intake checks for third-party apps and binaries - SBOM, OSV known vulnerabilities and Electron hardening.
+author: Sushant Nemade
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: Installed app directory, .asar archive or executable to scan.
+    required: true
+  osv:
+    description: Look up known vulnerabilities on OSV.dev. Sends only ecosystem, name and version of each component.
+    default: "true"
+  policy:
+    description: Optional policy TOML file.
+    default: ""
+  fail-on:
+    description: Decision that fails the step (reject, review or never).
+    default: reject
+  output-dir:
+    description: Directory for report.json, report.sarif, sbom.cdx.json and summary.md.
+    default: intake-gatekeeper-reports
+
+outputs:
+  decision:
+    description: approve, review or reject (error if no report was produced).
+    value: ${{ steps.scan.outputs.decision }}
+  sarif:
+    description: Path to the SARIF report.
+    value: ${{ steps.scan.outputs.sarif }}
+  sbom:
+    description: Path to the CycloneDX SBOM.
+    value: ${{ steps.scan.outputs.sbom }}
+
+runs:
+  using: composite
+  steps:
+    - id: python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+      with:
+        python-version: "3.13"
+        update-environment: false
+
+    - id: scan
+      shell: bash
+      env:
+        PYTHON: ${{ steps.python.outputs.python-path }}
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_OSV: ${{ inputs.osv }}
+        INPUT_POLICY: ${{ inputs.policy }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        set -u
+        venv="$RUNNER_TEMP/intake-gatekeeper-venv"
+        "$PYTHON" -m venv "$venv"
+        if [ -x "$venv/bin/python" ]; then py="$venv/bin/python"; else py="$venv/Scripts/python.exe"; fi
+        "$py" -m pip install --disable-pip-version-check --quiet --require-hashes --no-deps \
+          -r "$ACTION_PATH/action-requirements.txt"
+        mkdir -p "$OUTPUT_DIR"
+        args=(scan "$INPUT_PATH" --fail-on "$INPUT_FAIL_ON"
+          --json "$OUTPUT_DIR/report.json" --sarif "$OUTPUT_DIR/report.sarif"
+          --cyclonedx "$OUTPUT_DIR/sbom.cdx.json" --markdown "$OUTPUT_DIR/summary.md")
+        if [ "$INPUT_OSV" = "true" ]; then args+=(--osv); fi
+        if [ -n "$INPUT_POLICY" ]; then args+=(--policy "$INPUT_POLICY"); fi
+        set +e
+        PYTHONPATH="$ACTION_PATH/src" "$py" -m intake_gatekeeper "${args[@]}"
+        status=$?
+        set -e
+        if [ -f "$OUTPUT_DIR/summary.md" ]; then cat "$OUTPUT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+        decision=$("$py" -c 'import json,sys; print(json.load(open(sys.argv[1]))["decision"]["value"])' \
+          "$OUTPUT_DIR/report.json" 2>/dev/null || echo error)
+        {
+          echo "decision=$decision"
+          echo "sarif=$OUTPUT_DIR/report.sarif"
+          echo "sbom=$OUTPUT_DIR/sbom.cdx.json"
+        } >> "$GITHUB_OUTPUT"
+        exit "$status"

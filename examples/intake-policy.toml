@@ -1,0 +1,27 @@
+# Example intake policy. Copy it, adjust it and pass it with --policy.
+version = 1
+
+[gate]
+# Findings at or above this severity reject the target.
+reject_at = "high"
+# Findings at or above this severity (and below reject_at) require human review.
+review_at = "low"
+# Severity used when no advisory database rates a vulnerability.
+unrated_vulnerability = "medium"
+# Without a lookup, components cannot be cleared, so the best outcome is "review".
+require_vulnerability_lookup = true
+
+[rules]
+# Informational rules can be silenced for a whole organisation.
+disabled = ["EGK-JS-OPEN-EXTERNAL"]
+
+[rules.severity]
+# Raise or lower individual rules or advisories (by id or alias).
+"EGK-FUSE-RUN-AS-NODE" = "high"
+
+# Waivers must name what they cover, why, and when they expire. Expired waivers stop applying.
+[[waivers]]
+id = "CVE-2020-8203"
+component = "pkg:npm/lodash@4.17.15"
+reason = "Fictional example: lodash.zipObjectDeep is never called with untrusted input."
+expires = 2026-12-31

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+/build/
+/dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+# Built in CI/tests from examples/go-demo; never committed.
+examples/vulnerable-demo/bin/
+tests/.go-fixtures/
+reports/
+intake-gatekeeper.*

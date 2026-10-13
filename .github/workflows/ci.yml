@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  INTAKE_REQUIRE_GO_FIXTURES: "1"
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: ubuntu-latest
+            python: "3.13"
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: examples/go-demo/go.sum
+      - name: Install uv
+        run: python -m pip install uv==0.13.0
+      - name: Install frozen dependencies
+        run: uv sync --frozen --extra dev --python ${{ matrix.python }}
+      - name: Test (real Go binaries for PE, ELF and Mach-O)
+        run: uv run --frozen --extra dev pytest -q
+      - name: Lint
+        run: uv run --frozen --extra dev ruff check .
+      - name: Check formatting
+        run: uv run --frozen --extra dev ruff format --check .
+      - name: Type check
+        run: uv run --frozen --extra dev mypy
+      - name: Build and check distributions
+        run: |
+          uv run --frozen --extra dev python -m build
+          uv run --frozen --extra dev twine check dist/*
+      - name: Action requirements match the lockfile
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt -o "$RUNNER_TEMP/req.txt"
+          diff <(grep -v '^#' action-requirements.txt) <(grep -v '^#' "$RUNNER_TEMP/req.txt")
+      - name: Audit dependencies
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+        run: uv run --frozen --extra dev pip-audit --local --skip-editable --progress-spinner off
+
+  dogfood:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: examples/go-demo/go.sum
+      - name: Build demo binaries
+        run: python3 scripts/build_demo.py
+      - name: Scan the fictional vulnerable demo with the action (live OSV)
+        id: gate
+        uses: ./
+        with:
+          path: examples/vulnerable-demo
+          fail-on: never
+      - name: Expect a rejection with evidence
+        env:
+          DECISION: ${{ steps.gate.outputs.decision }}
+          REPORT: intake-gatekeeper-reports/report.json
+        run: |
+          test "$DECISION" = "reject"
+          python3 - <<'EOF'
+          import json, os
+          report = json.load(open(os.environ["REPORT"]))
+          ids = {f["rule_id"] for f in report["findings"]}
+          expected = {"GHSA-69ch-w2m2-3vjp", "GHSA-5crp-9r3c-p9vr", "GHSA-xvch-5gv4-984h",
+                      "EGK-JS-NODE-INTEGRATION", "EGK-FUSE-RUN-AS-NODE"}
+          missing = expected - ids
+          assert not missing, missing
+          blocking = [g for g in report["coverage_gaps"] if g["blocking"]]
+          assert not blocking, blocking
+          print(report["summary"])
+          EOF
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: demo-intake-reports
+          path: intake-gatekeeper-reports/
+          retention-days: 14
