@@ -3,6 +3,17 @@
 All notable changes are recorded here. The project follows [Semantic Versioning](https://semver.org/);
 while the major version is 0, minor releases may change behaviour.
 
+## [0.2.2] - 2026-10-15
+
+### Fixed
+
+- Update check: code findings in bundles whose file names carry a content hash
+  (`index-Cz8Eo_n9.js`, `main.3f2a1b9c.js`) are matched across versions instead of being reported
+  as new and resolved. Found on a real MarkText 0.21.1 to 0.21.2 comparison, where it removed 10
+  false new findings.
+- Network endpoints only count URLs that start a string literal. URLs in comments and license
+  headers are no longer reported; on the same comparison, new endpoints dropped from 44 to 1.
+
 ## [0.2.1] - 2026-10-15
 
 ### Added
@@ -52,6 +63,7 @@ First public release and first GitHub Marketplace listing.
 - No Rust `cargo auditable`, Python wheel, Java or native C/C++ inventories yet.
 - Electron code rules detect literal settings only.
 
+[0.2.2]: https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.1.0

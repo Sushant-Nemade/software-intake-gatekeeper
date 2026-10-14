@@ -23,7 +23,7 @@ Every finding names the file and, for scripts, the line, column and snippet that
 Anything the scanner could not verify is reported as a **coverage gap**. A blocking gap can
 never lead to APPROVE: an unknown result is not treated as safe.
 
-> Status: [v0.2.1](https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.1),
+> Status: [v0.2.2](https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.2),
 > an alpha release on [PyPI](https://pypi.org/project/software-intake-gatekeeper/) and the
 > [GitHub Marketplace](https://github.com/marketplace/actions/software-intake-gatekeeper). The CLI is
 > tested on Windows and Linux with real Go binaries in three object formats, an ASAR archive packed
@@ -56,9 +56,9 @@ python -m pip install software-intake-gatekeeper
 To verify build provenance first, install the wheel from the GitHub release instead:
 
 ```powershell
-gh release download v0.2.1 -R Sushant-Nemade/software-intake-gatekeeper -p "*.whl"
-gh attestation verify software_intake_gatekeeper-0.2.1-py3-none-any.whl -R Sushant-Nemade/software-intake-gatekeeper
-python -m pip install software_intake_gatekeeper-0.2.1-py3-none-any.whl
+gh release download v0.2.2 -R Sushant-Nemade/software-intake-gatekeeper -p "*.whl"
+gh attestation verify software_intake_gatekeeper-0.2.2-py3-none-any.whl -R Sushant-Nemade/software-intake-gatekeeper
+python -m pip install software_intake_gatekeeper-0.2.2-py3-none-any.whl
 ```
 
 Or install from a clone (needed for the demo below):
@@ -149,10 +149,10 @@ Components changed: 2 | endpoints +1/-0 | binaries +1/-0/~0
 
 | The update check reports | How it is matched |
 |---|---|
-| New and resolved findings | Advisory id plus package name (so a version bump that keeps the bug counts as persisting), or rule plus file |
+| New and resolved findings | Advisory id plus package name (so a version bump that keeps the bug counts as persisting), or rule plus file. Content hashes in bundle names (`index-Cz8Eo_n9.js`, `main.3f2a1b9c.js`) are ignored, so a rebuilt bundle does not look new |
 | Component changes | Added, removed or changed versions per ecosystem and name |
 | Electron | Runtime version change and every fuse change; a fuse moving into its risky state is **weakened** |
-| Network endpoints | Hosts in `http(s)://` and `ws(s)://` URLs in app code (outside `node_modules`), without XML namespaces or local addresses |
+| Network endpoints | Hosts of `http(s)://` and `ws(s)://` URLs that start a string literal in app code (outside `node_modules`); URLs in comments and license headers, XML namespaces and local addresses are skipped |
 | Executables and native modules | Added, removed or changed (SHA-256) PE, ELF and Mach-O files, including `.node` modules |
 
 **REJECT** if a new finding reaches `reject_at`. **REVIEW** for new findings at `review_at`, weakened
@@ -321,6 +321,7 @@ and a `SHA256SUMS` file.
 | Output formats | CycloneDX validated with `cyclonedx-python-lib` against the 1.6 schema in tests. SARIF validated against the OASIS 2.1.0 schema during development |
 | OSV client | Mocked transport tests (batching, pagination, retries, alias grouping, withdrawn advisories) plus an opt-in live test (`INTAKE_LIVE_OSV=1`) |
 | Scale | Read-only scan of a locally installed VS Code: 3,243 files and 5,451 archive entries in about 19 s with a warm file cache |
+| Real update | Update check of the open-source editor MarkText 0.21.1 to 0.21.2 (official Windows zips, checksums verified; 20,072 ASAR entries, 505 npm packages, live OSV) in about 30 s. It showed 27 resolved advisories, 49 new packages and changed native modules. The first run also reported 10 new and 10 resolved code findings that were only a renamed bundle (`index-BBEVtY79.js` to `index-Cz8Eo_n9.js`), and 44 new endpoints taken from code comments; v0.2.2 fixed both, leaving 0 new findings and 1 new endpoint |
 | CI | Ubuntu (Python 3.11 and 3.13) and Windows (3.13): pytest, ruff, mypy `--strict`, build, twine, pip-audit. The action itself runs on Ubuntu, Windows and macOS against the demo with live OSV, plus fail-on, invalid-input and update-check (`compare-to`) runs |
 
 No third-party application files are committed. The local real-app checks are listed for

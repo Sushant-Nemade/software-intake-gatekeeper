@@ -130,7 +130,10 @@ def find_electron_versions(data: Bytes) -> list[str]:
     return sorted(versions)
 
 
-_URL_HOST = re.compile(r"(?:https?|wss?)://([A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})+)(?![A-Za-z0-9-])")
+# Only URLs that start a string literal: code calls those, while comments and license headers do not.
+_URL_HOST = re.compile(
+    r"[\"'`](?:https?|wss?)://([A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})+)(?![A-Za-z0-9-])"
+)
 # Namespace and spec URLs that appear in almost every bundle but are not network endpoints.
 _NOT_ENDPOINTS = {
     "www.w3.org",

@@ -159,3 +159,49 @@ def test_endpoints_ignore_namespaces_and_local_hosts() -> None:
         'c="http://127.0.0.1/" d="wss://socket.vendor.example" e="https://cdn.vendor.example."'
     )
     assert find_endpoints(text) == {"api.vendor.example", "socket.vendor.example", "cdn.vendor.example"}
+
+
+def test_endpoints_skip_urls_in_comments_and_prose() -> None:
+    from intake_gatekeeper.electron import find_endpoints
+
+    text = (
+        "/*! lib v1 | (c) https://license-host.example */\n"
+        "// see https://docs.example/issue\n"
+        'throw new Error("Read https://help.example/x");\n'
+        "fetch('https://api.vendor.example/v1'); new WebSocket(`wss://live.vendor.example/s`);\n"
+    )
+    assert find_endpoints(text) == {"api.vendor.example", "live.vendor.example"}
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        (
+            "resources/app.asar!/out/renderer/assets/index-Cz8Eo_n9.js",
+            "resources/app.asar!/out/renderer/assets/index-*.js",
+        ),
+        ("dist/main.3f2a1b9c.js", "dist/main.*.js"),
+        ("dist/vendors-chunk.0a1b2c3d4e5f.css", "dist/vendors-chunk.*.css"),
+        ("resources/app/main.js", "resources/app/main.js"),
+        ("out/index-renderer.js", "out/index-renderer.js"),
+        ("out/polyfills-es2015.js", "out/polyfills-es2015.js"),
+        ("index-Cz8Eo_n9.js", "index-*.js"),
+    ],
+)
+def test_stable_path_ignores_content_hashes(path: str, expected: str) -> None:
+    from intake_gatekeeper.diff import stable_path
+
+    assert stable_path(path) == expected
+
+
+def test_renamed_bundle_keeps_findings_persisting(tmp_path: Path) -> None:
+    code = "new BrowserWindow({ webPreferences: { nodeIntegration: true } });\n"
+    old, new = tmp_path / "old" / "assets", tmp_path / "new" / "assets"
+    old.mkdir(parents=True)
+    new.mkdir(parents=True)
+    (old / "index-BBEVtY79.js").write_text(code, encoding="utf-8")
+    (new / "index-Cz8Eo_n9.js").write_text(code, encoding="utf-8")
+    diff = compare(_scan(old.parent), _scan(new.parent), OFFLINE)
+    assert diff.new_findings == [] and diff.resolved_findings == []
+    assert diff.persisting_findings == 1
+    assert diff.decision is Decision.APPROVE

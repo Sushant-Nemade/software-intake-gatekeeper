@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from intake_gatekeeper.electron import FUSE_RULES
@@ -53,10 +54,19 @@ class UpdateDiff:
     reasons: list[str] = field(default_factory=list)
 
 
+# Content hashes that bundlers put in file names (index-Cz8Eo_n9.js, main.3f2a1b9c.js) change every build.
+_CONTENT_HASH = re.compile(r"([.-])(?=[A-Za-z_-]*\d)[A-Za-z0-9_-]{8,}(?=\.(?:m?js|cjs|css)$)")
+
+
+def stable_path(path: str) -> str:
+    head, slash, name = path.rpartition("/")
+    return head + slash + _CONTENT_HASH.sub(r"\1*", name)
+
+
 def _finding_key(finding: Finding) -> tuple[str, str]:
     if finding.component_purl:
         return finding.rule_id, finding.component_purl.rsplit("@", 1)[0]
-    return finding.rule_id, finding.location.path if finding.location else ""
+    return finding.rule_id, stable_path(finding.location.path) if finding.location else ""
 
 
 def _versions(report: Report) -> dict[tuple[str, str], set[str]]:
