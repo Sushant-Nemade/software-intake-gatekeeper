@@ -29,9 +29,7 @@ def _u32(data: bytes, at: int) -> int:
     return int(struct.unpack_from("<I", data, at)[0])
 
 
-def read_header(
-    handle: BinaryIO, archive_size: int, max_header_bytes: int
-) -> tuple[dict[str, object], int]:
+def read_header(handle: BinaryIO, archive_size: int, max_header_bytes: int) -> tuple[dict[str, object], int]:
     """Return the parsed header and the absolute offset where file contents start."""
     prefix = handle.read(8)
     if len(prefix) != 8 or _u32(prefix, 0) != 4:

@@ -14,18 +14,24 @@ compiled binary. It never runs or unpacks it. It produces:
 - **Electron hardening checks** for the fuse wire inside the executable and risky `BrowserWindow`
   settings in the app code,
 - an **APPROVE / REVIEW / REJECT** decision from a versioned policy, with expiring waivers,
+- an **update check** that compares two versions and gates on what the update *adds*: new
+  vulnerabilities, weakened Electron fuses, new network endpoints, new native modules,
 - **SARIF** for GitHub code scanning, a **Markdown** summary for pull requests and a full **JSON** evidence report.
 
 Every finding names the file and, for scripts, the line, column and snippet that produced it.
 Anything the scanner could not verify is reported as a **coverage gap**. A blocking gap can
 never lead to APPROVE: an unknown result is not treated as safe.
 
-> Status: [v0.1.0](https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.1.0),
+> Status: [v0.2.0](https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.0),
 > an alpha release listed on the
 > [GitHub Marketplace](https://github.com/marketplace/actions/software-intake-gatekeeper). The CLI is
 > tested on Windows and Linux with real Go binaries in three object formats, an ASAR archive packed
 > by the official `@electron/asar` tool and the live OSV API; the action also runs on macOS. The
 > results are static, version-level evidence, not proof of exploitability.
+
+Part of a small **software trust toolkit** with
+[Privacy Flow Inspector](https://github.com/Sushant-Nemade/privacy-flow-inspector): this tool checks
+what is **inside** an app; the inspector checks which personal data the app **sends out**.
 
 ## Where it helps
 
@@ -41,9 +47,9 @@ never lead to APPROVE: an unknown result is not treated as safe.
 Install the released wheel (Python 3.11+). Optionally verify its build provenance first:
 
 ```powershell
-gh release download v0.1.0 -R Sushant-Nemade/software-intake-gatekeeper -p "*.whl"
-gh attestation verify software_intake_gatekeeper-0.1.0-py3-none-any.whl -R Sushant-Nemade/software-intake-gatekeeper
-python -m pip install software_intake_gatekeeper-0.1.0-py3-none-any.whl
+gh release download v0.2.0 -R Sushant-Nemade/software-intake-gatekeeper -p "*.whl"
+gh attestation verify software_intake_gatekeeper-0.2.0-py3-none-any.whl -R Sushant-Nemade/software-intake-gatekeeper
+python -m pip install software_intake_gatekeeper-0.2.0-py3-none-any.whl
 ```
 
 Or install from a clone (needed for the demo below):
@@ -104,6 +110,46 @@ smallest listed fixed version above the current one (for example `minimist 1.2.6
 `Newtonsoft.Json 13.0.1`). One lodash advisory shows as *waived* because the example policy
 accepts it until 2026-12-31 with a written reason.
 
+### Check an update before rolling it out
+
+`diff` scans the version you run today and the new one, then decides on **what the update adds**.
+Persisting issues are listed but do not block the update; run `scan` for an absolute assessment.
+
+```powershell
+intake-gatekeeper diff examples/update-demo/v1 examples/update-demo/v2 --osv `
+  --json reports/update.json --markdown reports/update.md --sarif reports/update.sarif
+```
+
+Real output for the fictional [update demo](examples/update-demo) (2026-10-14, live OSV). Version 2
+fixes a `nodeIntegration` setting and upgrades lodash, but adds axios 0.21.1, a telemetry endpoint and
+a native module:
+
+```text
+Update decision: REJECT
+  - 12 new finding(s) at or above high.
+  - 13 new finding(s) between low and high.
+  - 1 new network endpoint(s) referenced by app code.
+  - 1 new executable(s) or native module(s).
+  - 1 new component(s).
+Findings: 25 new, 4 resolved, 1 persisting
+Components changed: 2 | endpoints +1/-0 | binaries +1/-0/~0
+  NEW [HIGH    ] GHSA-cph5-m8f7-6c5x axios 0.21.1: axios Inefficient Regular Expression Complexity vulnerability
+  ...
+  NEW endpoint collect.metrics-collector.example
+```
+
+| The update check reports | How it is matched |
+|---|---|
+| New and resolved findings | Advisory id plus package name (so a version bump that keeps the bug counts as persisting), or rule plus file |
+| Component changes | Added, removed or changed versions per ecosystem and name |
+| Electron | Runtime version change and every fuse change; a fuse moving into its risky state is **weakened** |
+| Network endpoints | Hosts in `http(s)://` and `ws(s)://` URLs in app code (outside `node_modules`), without XML namespaces or local addresses |
+| Executables and native modules | Added, removed or changed (SHA-256) PE, ELF and Mach-O files, including `.node` modules |
+
+**REJECT** if a new finding reaches `reject_at`. **REVIEW** for new findings at `review_at`, weakened
+fuses, new endpoints, new binaries, new components or blocking gaps in the new version.
+**APPROVE** otherwise. The SARIF output contains only the new findings.
+
 ## What it inspects
 
 | Evidence | Source inside the target | Output |
@@ -114,6 +160,8 @@ accepts it until 2026-12-31 with a written reason.
 | .NET shared framework | `*.runtimeconfig.json` | Minimum framework version, plus a note that the host runtime decides the patch level |
 | Electron runtime | The fuse sentinel and `Electron/x.y.z` string in the executable | Electron version (queried as npm `electron`) and the fuse states |
 | Electron app code | `.js/.cjs/.mjs/.ts` files outside `node_modules`, on disk or in `.asar` | `webPreferences` rule findings with line, column and snippet |
+| Network endpoints | `http(s)://` and `ws(s)://` hosts referenced by that app code | Host list with up to three source files each (used by the update check) |
+| Executables and native modules | PE, ELF and Mach-O files, including `.node` add-ons | Path, size, SHA-256 and kind (Go, Electron, native) |
 
 ### Electron rules
 
@@ -217,6 +265,7 @@ For supply-chain hardening, pin the action to the full commit SHA of a release i
 | Input | Default | Description |
 |---|---|---|
 | `path` | (required) | Installed app directory, `.asar` archive or executable to scan. |
+| `compare-to` | `""` | Previous version of the same app. When set, the action runs the update check and gates on what the update adds. |
 | `osv` | `true` | Look up known vulnerabilities on OSV.dev. Sends only ecosystem, name and version. Set `false` for fully offline runs. |
 | `policy` | `""` | Path to a policy TOML file (see [examples/intake-policy.toml](examples/intake-policy.toml)). |
 | `fail-on` | `reject` | Decision that fails the step: `reject`, `review` or `never`. |
@@ -263,7 +312,7 @@ and a `SHA256SUMS` file.
 | Output formats | CycloneDX validated with `cyclonedx-python-lib` against the 1.6 schema in tests. SARIF validated against the OASIS 2.1.0 schema during development |
 | OSV client | Mocked transport tests (batching, pagination, retries, alias grouping, withdrawn advisories) plus an opt-in live test (`INTAKE_LIVE_OSV=1`) |
 | Scale | Read-only scan of a locally installed VS Code: 3,243 files and 5,451 archive entries in about 19 s with a warm file cache |
-| CI | Ubuntu (Python 3.11 and 3.13) and Windows (3.13): pytest, ruff, mypy `--strict`, build, twine, pip-audit. The action itself runs on Ubuntu, Windows and macOS against the demo with live OSV, plus fail-on and invalid-input checks |
+| CI | Ubuntu (Python 3.11 and 3.13) and Windows (3.13): pytest, ruff, mypy `--strict`, build, twine, pip-audit. The action itself runs on Ubuntu, Windows and macOS against the demo with live OSV, plus fail-on, invalid-input and update-check (`compare-to`) runs |
 
 No third-party application files are committed. The local real-app checks are listed for
 transparency only.
@@ -284,9 +333,12 @@ transparency only.
 ## Roadmap
 
 1. Rust `cargo auditable`, Python `*.dist-info` and Java `pom.properties` inventories.
-2. Version-to-version diff (new endpoints, new native modules, changed fuses) for update reviews.
-3. A local PII-in-HAR inspector for GDPR-focused reviews.
-4. An optional adapter for reverse-engineering evidence tools behind an approval gate.
+2. Signature and publisher changes (Authenticode, code signing) in the update check.
+3. An optional adapter for reverse-engineering evidence tools behind an approval gate.
+
+Shipped from earlier roadmap items: the version-to-version update check (v0.2.0) and the
+PII-in-HAR inspector, released as the separate
+[Privacy Flow Inspector](https://github.com/Sushant-Nemade/privacy-flow-inspector).
 
 ## Development
 

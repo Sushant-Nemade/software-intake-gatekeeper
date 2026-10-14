@@ -47,8 +47,7 @@ RULES: dict[str, Rule] = {
             "EGK-JS-INSECURE-CONTENT",
             "Insecure (HTTP) content may run on HTTPS pages",
             Severity.HIGH,
-            "allowRunningInsecureContent: true lets scripts from plain HTTP origins run in "
-            "secure pages.",
+            "allowRunningInsecureContent: true lets scripts from plain HTTP origins run in secure pages.",
             ELECTRON_SECURITY + "#8-do-not-enable-allowrunninginsecurecontent",
         ),
         Rule(
@@ -142,8 +141,7 @@ RULES: dict[str, Rule] = {
             "EGK-FUSE-COOKIE-ENCRYPTION-OFF",
             "Cookie encryption is disabled",
             Severity.LOW,
-            "Without the EnableCookieEncryption fuse, the cookie store is not encrypted with "
-            "OS-level keys.",
+            "Without the EnableCookieEncryption fuse, the cookie store is not encrypted with OS-level keys.",
             ELECTRON_FUSES + "#cookieencryption",
         ),
         Rule(

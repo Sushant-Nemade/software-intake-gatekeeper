@@ -48,9 +48,7 @@ RECORDS: dict[str, dict[str, Any]] = {
         "affected": [
             {
                 "package": {"ecosystem": "Go", "name": "golang.org/x/text"},
-                "ranges": [
-                    {"type": "SEMVER", "events": [{"introduced": "0"}, {"fixed": "0.39.0"}]}
-                ],
+                "ranges": [{"type": "SEMVER", "events": [{"introduced": "0"}, {"fixed": "0.39.0"}]}],
             }
         ],
     },
@@ -66,9 +64,7 @@ RECORDS: dict[str, dict[str, Any]] = {
         "affected": [
             {
                 "package": {"ecosystem": "npm", "name": "lodash"},
-                "ranges": [
-                    {"type": "SEMVER", "events": [{"introduced": "3.7.0"}, {"fixed": "4.17.19"}]}
-                ],
+                "ranges": [{"type": "SEMVER", "events": [{"introduced": "3.7.0"}, {"fixed": "4.17.19"}]}],
             }
         ],
     },
@@ -90,9 +86,7 @@ def _server(log: list[httpx.Request], fail: dict[str, list[int]] | None = None) 
             return httpx.Response(statuses.pop(0), headers={"Retry-After": "0"})
         if request.url.path == "/v1/querybatch":
             queries = json.loads(request.content)["queries"]
-            results = [
-                {"vulns": [{"id": i} for i in BATCH.get(q["package"]["name"], [])]} for q in queries
-            ]
+            results = [{"vulns": [{"id": i} for i in BATCH.get(q["package"]["name"], [])]} for q in queries]
             return httpx.Response(200, json={"results": results})
         vuln_id = request.url.path.rsplit("/", 1)[1]
         if vuln_id in RECORDS:
@@ -103,9 +97,7 @@ def _server(log: list[httpx.Request], fail: dict[str, list[int]] | None = None) 
 
 
 def _client(handler: Handler) -> OsvClient:
-    return OsvClient(
-        client=httpx.Client(transport=httpx.MockTransport(handler)), sleep=lambda _: None
-    )
+    return OsvClient(client=httpx.Client(transport=httpx.MockTransport(handler)), sleep=lambda _: None)
 
 
 def test_lookup_groups_aliases_and_resolves_severity() -> None:
@@ -170,9 +162,7 @@ def test_pagination_follows_tokens() -> None:
         if request.url.path == "/v1/querybatch":
             return httpx.Response(
                 200,
-                json={
-                    "results": [{"vulns": [{"id": "GHSA-p6mc-m468-83gw"}], "next_page_token": "t"}]
-                },
+                json={"results": [{"vulns": [{"id": "GHSA-p6mc-m468-83gw"}], "next_page_token": "t"}]},
             )
         if request.url.path == "/v1/query":
             assert json.loads(request.content)["page_token"] == "t"

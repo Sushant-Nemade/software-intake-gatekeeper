@@ -85,9 +85,7 @@ def test_lookup_disabled_cannot_approve(tmp_path: Path, capsys: pytest.CaptureFi
     assert cli.main(["scan", str(tmp_path), "--fail-on", "review"]) == cli.EXIT_GATE
     assert "lookup-disabled" in capsys.readouterr().out
     assert (
-        cli.main(
-            ["scan", str(tmp_path), "--osv", "--fail-on", "review", "-q"], osv_factory=_offline_osv
-        )
+        cli.main(["scan", str(tmp_path), "--osv", "--fail-on", "review", "-q"], osv_factory=_offline_osv)
         == cli.EXIT_OK
     )
 
@@ -98,9 +96,7 @@ def test_policy_can_relax_lookup_requirement(tmp_path: Path) -> None:
     )
     policy = tmp_path / "policy.toml"
     policy.write_text("[gate]\nrequire_vulnerability_lookup = false\n", encoding="utf-8")
-    assert (
-        cli.main(["scan", str(tmp_path), "--policy", str(policy), "--fail-on", "review", "-q"]) == 0
-    )
+    assert cli.main(["scan", str(tmp_path), "--policy", str(policy), "--fail-on", "review", "-q"]) == 0
 
 
 def test_empty_directory_is_not_approved(tmp_path: Path) -> None:

@@ -47,10 +47,7 @@ def test_safe_or_unrelated_code_is_quiet(source: str) -> None:
 
 
 def test_locations_report_line_column_and_snippet() -> None:
-    text = (
-        "const a = 1;\nconst w = new BrowserWindow({\n"
-        "  webPreferences: { nodeIntegration: true }\n});"
-    )
+    text = "const a = 1;\nconst w = new BrowserWindow({\n  webPreferences: { nodeIntegration: true }\n});"
     ((rule, location),) = electron.scan_javascript(text, "src/main.js")
     assert rule == "EGK-JS-NODE-INTEGRATION"
     assert (location.path, location.line, location.column) == ("src/main.js", 3, 21)

@@ -1,0 +1,154 @@
+"""Compare two scanned versions of the same software and decide whether the update adds risk."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from intake_gatekeeper.electron import FUSE_RULES
+from intake_gatekeeper.model import Decision, Finding, Report
+from intake_gatekeeper.policy import Policy
+
+
+@dataclass(frozen=True)
+class ComponentChange:
+    ecosystem: str
+    name: str
+    old: tuple[str, ...]
+    new: tuple[str, ...]
+
+    @property
+    def kind(self) -> str:
+        if not self.old:
+            return "added"
+        if not self.new:
+            return "removed"
+        return "changed"
+
+
+@dataclass(frozen=True)
+class FuseChange:
+    executable: str
+    fuse: str
+    old: str | None
+    new: str | None
+    weakened: bool
+
+
+@dataclass
+class UpdateDiff:
+    old: Report
+    new: Report
+    components: list[ComponentChange] = field(default_factory=list)
+    new_findings: list[Finding] = field(default_factory=list)
+    resolved_findings: list[Finding] = field(default_factory=list)
+    persisting_findings: int = 0
+    electron_versions: tuple[str | None, str | None] | None = None
+    fuse_changes: list[FuseChange] = field(default_factory=list)
+    endpoints_added: list[str] = field(default_factory=list)
+    endpoints_removed: list[str] = field(default_factory=list)
+    binaries_added: list[str] = field(default_factory=list)
+    binaries_removed: list[str] = field(default_factory=list)
+    binaries_changed: list[str] = field(default_factory=list)
+    decision: Decision = Decision.APPROVE
+    reasons: list[str] = field(default_factory=list)
+
+
+def _finding_key(finding: Finding) -> tuple[str, str]:
+    if finding.component_purl:
+        return finding.rule_id, finding.component_purl.rsplit("@", 1)[0]
+    return finding.rule_id, finding.location.path if finding.location else ""
+
+
+def _versions(report: Report) -> dict[tuple[str, str], set[str]]:
+    versions: dict[tuple[str, str], set[str]] = {}
+    for component in report.inventory.components:
+        if component.kind == "application":
+            continue
+        versions.setdefault((component.ecosystem, component.name), set()).add(component.version)
+    return versions
+
+
+def compare(old: Report, new: Report, policy: Policy) -> UpdateDiff:
+    diff = UpdateDiff(old=old, new=new)
+
+    old_versions, new_versions = _versions(old), _versions(new)
+    for key in sorted(old_versions.keys() | new_versions.keys()):
+        before, after = old_versions.get(key, set()), new_versions.get(key, set())
+        if before != after:
+            diff.components.append(
+                ComponentChange(key[0], key[1], tuple(sorted(before)), tuple(sorted(after)))
+            )
+
+    old_keys = {_finding_key(f) for f in old.inventory.findings}
+    new_keys = {_finding_key(f) for f in new.inventory.findings}
+    diff.new_findings = [f for f in new.inventory.findings if _finding_key(f) not in old_keys]
+    diff.resolved_findings = [f for f in old.inventory.findings if _finding_key(f) not in new_keys]
+    diff.persisting_findings = len(new.inventory.findings) - len(diff.new_findings)
+
+    old_electron = {info.executable: info for info in old.inventory.electron}
+    new_electron = {info.executable: info for info in new.inventory.electron}
+    old_version = next((i.version for i in old.inventory.electron if i.version), None)
+    new_version = next((i.version for i in new.inventory.electron if i.version), None)
+    if old_version != new_version:
+        diff.electron_versions = (old_version, new_version)
+    risky = {fuse: state for fuse, state, _ in FUSE_RULES}
+    for executable in sorted(old_electron.keys() | new_electron.keys()):
+        old_fuses = old_electron[executable].fuses if executable in old_electron else {}
+        new_fuses = new_electron[executable].fuses if executable in new_electron else {}
+        for fuse in sorted(old_fuses.keys() | new_fuses.keys()):
+            if old_fuses.get(fuse) != new_fuses.get(fuse):
+                weakened = fuse in risky and new_fuses.get(fuse) == risky[fuse]
+                diff.fuse_changes.append(
+                    FuseChange(executable, fuse, old_fuses.get(fuse), new_fuses.get(fuse), weakened)
+                )
+
+    old_hosts, new_hosts = set(old.inventory.endpoints), set(new.inventory.endpoints)
+    diff.endpoints_added = sorted(new_hosts - old_hosts)
+    diff.endpoints_removed = sorted(old_hosts - new_hosts)
+
+    old_bins = {b.path: b.sha256 for b in old.inventory.binaries}
+    new_bins = {b.path: b.sha256 for b in new.inventory.binaries}
+    diff.binaries_added = sorted(new_bins.keys() - old_bins.keys())
+    diff.binaries_removed = sorted(old_bins.keys() - new_bins.keys())
+    diff.binaries_changed = sorted(p for p in new_bins.keys() & old_bins.keys() if new_bins[p] != old_bins[p])
+
+    diff.decision, diff.reasons = _decide(diff, policy)
+    return diff
+
+
+def _decide(diff: UpdateDiff, policy: Policy) -> tuple[Decision, list[str]]:
+    active = [f for f in diff.new_findings if not f.waived]
+    at_reject = [f for f in active if f.severity >= policy.reject_at]
+    at_review = [f for f in active if policy.review_at <= f.severity < policy.reject_at]
+    weakened = [c for c in diff.fuse_changes if c.weakened]
+    added_components = [c for c in diff.components if c.kind == "added"]
+    blocking = [g for g in diff.new.inventory.gaps if g.blocking]
+    reasons: list[str] = []
+    if at_reject:
+        reasons.append(f"{len(at_reject)} new finding(s) at or above {policy.reject_at.label}.")
+    if at_review:
+        reasons.append(
+            f"{len(at_review)} new finding(s) between {policy.review_at.label} and {policy.reject_at.label}."
+        )
+    if weakened:
+        reasons.append(f"{len(weakened)} Electron fuse(s) weakened.")
+    if diff.endpoints_added:
+        reasons.append(f"{len(diff.endpoints_added)} new network endpoint(s) referenced by app code.")
+    if diff.binaries_added:
+        reasons.append(f"{len(diff.binaries_added)} new executable(s) or native module(s).")
+    if added_components:
+        reasons.append(f"{len(added_components)} new component(s).")
+    if blocking:
+        reasons.append(
+            f"{len(blocking)} coverage gap(s) in the new version: "
+            + "; ".join(sorted({g.code for g in blocking}))
+            + "."
+        )
+    if at_reject:
+        return Decision.REJECT, reasons
+    if reasons:
+        return Decision.REVIEW, reasons
+    summary = "No new risk compared with the previous version"
+    if diff.resolved_findings:
+        summary += f"; {len(diff.resolved_findings)} finding(s) resolved"
+    return Decision.APPROVE, [summary + "."]

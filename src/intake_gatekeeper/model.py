@@ -68,9 +68,7 @@ def nearest_fix(current: str, fixed: tuple[str, ...]) -> str | None:
     if current_key is None:
         return None
     candidates = [
-        (key, value)
-        for value in fixed
-        if (key := version_key(value)) is not None and key > current_key
+        (key, value) for value in fixed if (key := version_key(value)) is not None and key > current_key
     ]
     return min(candidates)[1] if candidates else None
 
@@ -178,12 +176,22 @@ class ElectronInfo:
     fuses: dict[str, str]
 
 
+@dataclass(frozen=True)
+class BinaryInfo:
+    path: str
+    size: int
+    sha256: str
+    kind: str
+
+
 @dataclass
 class Inventory:
     components: list[Component] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     gaps: list[Gap] = field(default_factory=list)
     electron: list[ElectronInfo] = field(default_factory=list)
+    endpoints: dict[str, list[str]] = field(default_factory=dict)
+    binaries: list[BinaryInfo] = field(default_factory=list)
     files_examined: int = 0
     archive_entries_examined: int = 0
 

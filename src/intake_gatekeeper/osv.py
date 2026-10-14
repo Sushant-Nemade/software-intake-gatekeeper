@@ -125,9 +125,7 @@ class OsvClient:
                 pages = 0
                 while isinstance(token, str) and token and pages < _MAX_PAGES:
                     pages += 1
-                    page = self._request(
-                        "POST", "/v1/query", {**queries[offset], "page_token": token}
-                    )
+                    page = self._request("POST", "/v1/query", {**queries[offset], "page_token": token})
                     if not isinstance(page, dict):
                         raise OsvError("OSV page response is not an object")
                     ids.update(_ids(page.get("vulns")))
@@ -195,9 +193,7 @@ def _strings(value: object) -> list[str]:
 def _ids(value: object) -> set[str]:
     if not isinstance(value, list):
         return set()
-    return {
-        item["id"] for item in value if isinstance(item, dict) and isinstance(item.get("id"), str)
-    }
+    return {item["id"] for item in value if isinstance(item, dict) and isinstance(item.get("id"), str)}
 
 
 def _own_severity(record: dict[str, Any]) -> Severity | None:

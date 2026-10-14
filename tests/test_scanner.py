@@ -40,9 +40,7 @@ def test_demo_inventory(demo_target: Path) -> None:
     assert "EGK-JS-NODE-INTEGRATION" in rules
     assert "EGK-FUSE-RUN-AS-NODE" in rules
     # node_modules/lodash/index.js contains nodeIntegration: true but third-party code is skipped.
-    assert all(
-        "node_modules" not in (f.location.path if f.location else "") for f in inventory.findings
-    )
+    assert all("node_modules" not in (f.location.path if f.location else "") for f in inventory.findings)
     assert inventory.electron[0].version == "28.0.0"
     assert [gap.code for gap in inventory.gaps] == ["host-runtime"]
 

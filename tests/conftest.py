@@ -53,6 +53,4 @@ def go_binaries(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
 def go_version_m(path: Path) -> str:
     go = _go()
     assert go is not None
-    return subprocess.run(
-        [go, "version", "-m", str(path)], check=True, capture_output=True, text=True
-    ).stdout
+    return subprocess.run([go, "version", "-m", str(path)], check=True, capture_output=True, text=True).stdout

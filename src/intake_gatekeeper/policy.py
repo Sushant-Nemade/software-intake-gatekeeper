@@ -102,9 +102,7 @@ def load_policy(path: Path | None) -> Policy:
     overrides_raw = rules.get("severity", {})
     if not isinstance(overrides_raw, dict):
         raise PolicyError("[rules.severity] must be a table")
-    overrides = {
-        str(key): _severity(value, f"rules.severity.{key}") for key, value in overrides_raw.items()
-    }
+    overrides = {str(key): _severity(value, f"rules.severity.{key}") for key, value in overrides_raw.items()}
 
     waivers_raw = data.get("waivers", [])
     if not isinstance(waivers_raw, list):
@@ -124,9 +122,7 @@ def load_policy(path: Path | None) -> Policy:
             raise PolicyError(f"waiver {index}: 'reason' must explain the decision (10+ chars)")
         if not isinstance(expires, date) or hasattr(expires, "hour"):
             raise PolicyError(f"waiver {index}: 'expires' must be a TOML date like 2026-12-31")
-        if component is not None and not (
-            isinstance(component, str) and component.startswith("pkg:")
-        ):
+        if component is not None and not (isinstance(component, str) and component.startswith("pkg:")):
             raise PolicyError(f"waiver {index}: 'component' must be a package URL")
         waivers.append(Waiver(waiver_id.strip(), reason.strip(), expires, component))
 
@@ -141,9 +137,7 @@ def load_policy(path: Path | None) -> Policy:
     )
 
 
-def apply_policy(
-    findings: list[Finding], policy: Policy, today: date
-) -> tuple[list[Finding], list[Gap]]:
+def apply_policy(findings: list[Finding], policy: Policy, today: date) -> tuple[list[Finding], list[Gap]]:
     gaps: list[Gap] = []
     kept: list[Finding] = []
     used: set[int] = set()
@@ -171,9 +165,7 @@ def apply_policy(
                 )
             )
         elif index not in used:
-            gaps.append(
-                Gap("waiver-unused", f"Waiver for {waiver.id} matched no finding.", blocking=False)
-            )
+            gaps.append(Gap("waiver-unused", f"Waiver for {waiver.id} matched no finding.", blocking=False))
     return kept, gaps
 
 
@@ -187,14 +179,11 @@ def decide(findings: list[Finding], gaps: list[Gap], policy: Policy) -> tuple[De
         reasons.append(f"{len(at_reject)} finding(s) at or above {policy.reject_at.label}.")
     if at_review:
         reasons.append(
-            f"{len(at_review)} finding(s) between {policy.review_at.label} and "
-            f"{policy.reject_at.label}."
+            f"{len(at_review)} finding(s) between {policy.review_at.label} and {policy.reject_at.label}."
         )
     if blocking:
         reasons.append(
-            f"{len(blocking)} coverage gap(s): "
-            + "; ".join(sorted({g.code for g in blocking}))
-            + "."
+            f"{len(blocking)} coverage gap(s): " + "; ".join(sorted({g.code for g in blocking})) + "."
         )
     if at_reject:
         return Decision.REJECT, reasons

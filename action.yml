@@ -9,6 +9,9 @@ inputs:
   path:
     description: Installed app directory, .asar archive or executable to scan.
     required: true
+  compare-to:
+    description: Optional previous version of the same app. When set, the action gates the update on what it adds.
+    default: ""
   osv:
     description: Look up known vulnerabilities on OSV.dev. Sends only ecosystem, name and version of each component.
     default: "true"
@@ -48,6 +51,7 @@ runs:
         PYTHON: ${{ steps.python.outputs.python-path }}
         ACTION_PATH: ${{ github.action_path }}
         INPUT_PATH: ${{ inputs.path }}
+        INPUT_COMPARE_TO: ${{ inputs.compare-to }}
         INPUT_OSV: ${{ inputs.osv }}
         INPUT_POLICY: ${{ inputs.policy }}
         INPUT_FAIL_ON: ${{ inputs.fail-on }}
@@ -64,7 +68,12 @@ runs:
         "$py" -m pip install --disable-pip-version-check --quiet --require-hashes --no-deps \
           -r "$ACTION_PATH/action-requirements.txt"
         mkdir -p "$OUTPUT_DIR"
-        args=(scan "$INPUT_PATH" --fail-on "$INPUT_FAIL_ON"
+        if [ -n "$INPUT_COMPARE_TO" ]; then
+          args=(diff "$INPUT_COMPARE_TO" "$INPUT_PATH")
+        else
+          args=(scan "$INPUT_PATH")
+        fi
+        args+=(--fail-on "$INPUT_FAIL_ON"
           --json "$OUTPUT_DIR/report.json" --sarif "$OUTPUT_DIR/report.sarif"
           --cyclonedx "$OUTPUT_DIR/sbom.cdx.json" --markdown "$OUTPUT_DIR/summary.md")
         if [ "$INPUT_OSV" = "true" ]; then args+=(--osv); fi

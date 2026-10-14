@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import mmap
 import os
@@ -12,6 +13,7 @@ from pathlib import Path, PurePosixPath
 
 from intake_gatekeeper import asar, electron, golang
 from intake_gatekeeper.model import (
+    BinaryInfo,
     Component,
     ElectronInfo,
     Finding,
@@ -37,6 +39,7 @@ _VERSION_TEXT = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+_~-]{0,127}$")
 _NUGET_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,255}$")
 _MAX_LOCATIONS = 10
 _MAX_FINDINGS = 5000
+_MAX_ENDPOINTS = 2000
 _REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 
 
@@ -126,9 +129,7 @@ def _inspect_package_json(
     name, version = manifest.get("name"), manifest.get("version")
     if not isinstance(name, str) or not isinstance(version, str):
         if library:
-            collector.gap(
-                "parse-error", "Installed package has no name or version.", display, False
-            )
+            collector.gap("parse-error", "Installed package has no name or version.", display, False)
         return
     if not _NPM_NAME.fullmatch(name) or len(name) > 214 or not _VERSION_TEXT.fullmatch(version):
         collector.gap("parse-error", "Package name or version is not well formed.", display)
@@ -212,17 +213,32 @@ def _inspect_javascript(collector: _Collector, data: bytes, display: str) -> Non
     text = data.decode("utf-8", errors="replace")
     for rule_id, location in electron.scan_javascript(text, display):
         collector.finding(rule_id, location)
+    endpoints = collector.inventory.endpoints
+    for host in electron.find_endpoints(text):
+        if host in endpoints:
+            if len(endpoints[host]) < 3 and display not in endpoints[host]:
+                endpoints[host].append(display)
+        elif len(endpoints) < _MAX_ENDPOINTS:
+            endpoints[host] = [display]
 
 
 def _inspect_binary(collector: _Collector, data: golang.Bytes, display: str) -> None:
+    kinds: list[str] = []
     try:
         info = golang.read_buildinfo(data)
     except golang.LegacyGoBinary as error:
         collector.gap("unsupported-format", str(error), display)
         info = None
+        kinds.append("go")
     if info is not None:
         _record_go(collector, info, display)
+        kinds.append("go")
     wires = electron.read_fuse_wires(data)
+    if wires:
+        kinds.append("electron")
+    collector.inventory.binaries.append(
+        BinaryInfo(display, len(data), hashlib.sha256(data).hexdigest(), "+".join(kinds) or "native")
+    )
     if not wires:
         return
     versions = electron.find_electron_versions(data)
@@ -454,9 +470,7 @@ def scan_path(target: Path, limits: Limits | None = None) -> Inventory:
     return collector.inventory
 
 
-def _guarded(
-    collector: _Collector, path: Path, parts: tuple[str, ...], display: str, limits: Limits
-) -> None:
+def _guarded(collector: _Collector, path: Path, parts: tuple[str, ...], display: str, limits: Limits) -> None:
     try:
         _inspect_file(collector, path, parts, display, limits)
     except (OSError, ValueError) as error:

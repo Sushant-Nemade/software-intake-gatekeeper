@@ -32,9 +32,7 @@ FUSE_RULES = (
     ("GrantFileProtocolExtraPrivileges", "enabled", "EGK-FUSE-FILE-PROTOCOL-PRIVILEGES"),
 )
 _VERSION_PREFIX = b"Electron/"
-_VERSION = re.compile(
-    rb"Electron/(\d{1,3}\.\d{1,4}\.\d{1,4}(?:-(?:alpha|beta|nightly)\.[0-9.]{1,20})?)"
-)
+_VERSION = re.compile(rb"Electron/(\d{1,3}\.\d{1,4}\.\d{1,4}(?:-(?:alpha|beta|nightly)\.[0-9.]{1,20})?)")
 _MAX_VERSION_PROBES = 4096
 
 _TRUE = r"(?:true|!0|1)\b"
@@ -132,6 +130,29 @@ def find_electron_versions(data: Bytes) -> list[str]:
     return sorted(versions)
 
 
+_URL_HOST = re.compile(r"(?:https?|wss?)://([A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})+)(?![A-Za-z0-9-])")
+# Namespace and spec URLs that appear in almost every bundle but are not network endpoints.
+_NOT_ENDPOINTS = {
+    "www.w3.org",
+    "w3.org",
+    "schemas.xmlsoap.org",
+    "schemas.microsoft.com",
+    "json-schema.org",
+}
+
+
+def find_endpoints(text: str) -> set[str]:
+    hosts: set[str] = set()
+    for match in _URL_HOST.finditer(text):
+        host = match.group(1).lower().rstrip(".")
+        if host in _NOT_ENDPOINTS or host.startswith(("localhost", "127.")) or host.endswith(".localhost"):
+            continue
+        if host.replace(".", "").isdigit():
+            continue
+        hosts.add(host)
+    return hosts
+
+
 def _locate(text: str, path: str, start: int, end: int) -> Location:
     line = text.count("\n", 0, start) + 1
     column = start - (text.rfind("\n", 0, start) + 1) + 1
@@ -157,9 +178,7 @@ def scan_javascript(text: str, path: str) -> list[tuple[str, Location]]:
     sandbox_hits: set[int] = set()
     for preferences in _WEB_PREFERENCES.finditer(text):
         window = text[preferences.end() : preferences.end() + _WEB_PREFERENCES_WINDOW]
-        sandbox = next(
-            (m for m in _SANDBOX_OFF.finditer(window) if _boundary(window, m.start())), None
-        )
+        sandbox = next((m for m in _SANDBOX_OFF.finditer(window) if _boundary(window, m.start())), None)
         if sandbox is None:
             continue
         absolute = preferences.end() + sandbox.start()

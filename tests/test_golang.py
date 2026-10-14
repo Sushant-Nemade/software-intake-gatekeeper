@@ -24,14 +24,7 @@ def _uvarint(value: int) -> bytes:
 def _blob(version: str, modinfo: str, flags: int = 0x2) -> bytes:
     framed = _START + modinfo.encode() + _END
     header = golang.MAGIC + bytes([8, flags]) + b"\x00" * 16
-    return (
-        b"\x00" * 64
-        + header
-        + _uvarint(len(version))
-        + version.encode()
-        + _uvarint(len(framed))
-        + framed
-    )
+    return b"\x00" * 64 + header + _uvarint(len(version)) + version.encode() + _uvarint(len(framed)) + framed
 
 
 MODINFO = (
@@ -52,9 +45,7 @@ def test_parses_inline_buildinfo_with_replacements() -> None:
     assert info.go_version == "go1.21.3"
     assert info.main == golang.GoModule("example.com/tool", "v1.4.0")
     assert info.deps[0] == golang.GoModule("golang.org/x/net", "v0.17.0")
-    assert info.deps[1] == golang.GoModule(
-        "github.com/old/lib", "v1.0.0", "github.com/new/lib", "v1.2.0"
-    )
+    assert info.deps[1] == golang.GoModule("github.com/old/lib", "v1.0.0", "github.com/new/lib", "v1.2.0")
     assert info.deps[2].replace_path == "../lib"
     assert info.deps[2].replace_version == ""
     assert info.settings == {"GOOS": "linux"}

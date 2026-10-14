@@ -140,8 +140,35 @@ jobs:
           test "$STRICT" = "failure"
           test "$STRICT_DECISION" = "reject"
           test "$INVALID" = "failure"
+      - name: Compare two versions with the action (live OSV)
+        id: update
+        uses: ./
+        with:
+          path: examples/update-demo/v2
+          compare-to: examples/update-demo/v1
+          fail-on: never
+          output-dir: update-reports
+      - name: Expect the update to be rejected for what it adds
+        env:
+          DECISION: ${{ steps.update.outputs.decision }}
+        run: |
+          test "$DECISION" = "reject"
+          python - <<'EOF'
+          import json, pathlib
+          diff = json.loads(pathlib.Path("update-reports/report.json").read_text(encoding="utf-8"))
+          assert diff["schema"] == "software-intake-gatekeeper/diff/v1"
+          assert diff["endpoints"]["added"] == ["collect.metrics-collector.example"], diff["endpoints"]
+          assert diff["binaries"]["added"] == ["resources/app/node_modules/fast-native/build/Release/addon.node"]
+          new = {f["rule_id"] for f in diff["findings"]["new"]}
+          resolved = {f["rule_id"] for f in diff["findings"]["resolved"]}
+          assert "GHSA-cph5-m8f7-6c5x" in new, new
+          assert {"GHSA-p6mc-m468-83gw", "EGK-JS-NODE-INTEGRATION"} <= resolved, resolved
+          print(diff["decision"])
+          EOF
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: demo-intake-reports-${{ matrix.os }}
-          path: intake-gatekeeper-reports/
+          path: |
+            intake-gatekeeper-reports/
+            update-reports/
           retention-days: 14

@@ -9,9 +9,7 @@ import pytest
 from intake_gatekeeper.model import Component
 from intake_gatekeeper.osv import OsvClient
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("INTAKE_LIVE_OSV") != "1", reason="live OSV test is opt-in"
-)
+pytestmark = pytest.mark.skipif(os.environ.get("INTAKE_LIVE_OSV") != "1", reason="live OSV test is opt-in")
 
 
 def test_known_advisories_are_returned() -> None:

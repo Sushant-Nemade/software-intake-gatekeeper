@@ -96,8 +96,7 @@ expires = 2026-12-31
             "date",
         ),
         (
-            "[[waivers]]\nid='X'\nreason='long enough reason'\nexpires=2026-12-31\n"
-            "component='lodash'",
+            "[[waivers]]\nid='X'\nreason='long enough reason'\nexpires=2026-12-31\ncomponent='lodash'",
             "package URL",
         ),
         ("not toml [", "invalid policy TOML"),
@@ -146,12 +145,8 @@ def test_disabled_rules_and_overrides() -> None:
         disabled_rules=frozenset({"EGK-JS-OPEN-EXTERNAL"}),
         severity_overrides={"EGK-JS-WEBVIEW-TAG": Severity.CRITICAL},
     )
-    findings, _ = apply_policy(
-        [_finding("EGK-JS-OPEN-EXTERNAL", Severity.INFO), _finding()], policy, TODAY
-    )
-    assert [(f.rule_id, f.severity) for f in findings] == [
-        ("EGK-JS-WEBVIEW-TAG", Severity.CRITICAL)
-    ]
+    findings, _ = apply_policy([_finding("EGK-JS-OPEN-EXTERNAL", Severity.INFO), _finding()], policy, TODAY)
+    assert [(f.rule_id, f.severity) for f in findings] == [("EGK-JS-WEBVIEW-TAG", Severity.CRITICAL)]
 
 
 @pytest.mark.parametrize(
