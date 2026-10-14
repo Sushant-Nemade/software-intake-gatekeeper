@@ -34,6 +34,8 @@ Part of a small **software trust toolkit** with
 [Privacy Flow Inspector](https://github.com/Sushant-Nemade/privacy-flow-inspector): this tool checks
 what is **inside** an app; the inspector checks which personal data the app **sends out**.
 
+![Update check summary for the fictional demo: REJECT, 25 new findings, 1 new endpoint and 1 new native module](https://raw.githubusercontent.com/Sushant-Nemade/software-intake-gatekeeper/main/docs/images/update-check-summary.png)
+
 ## Where it helps
 
 | Who | Situation | What they get |
