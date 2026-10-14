@@ -20,9 +20,12 @@ Every finding names the file and, for scripts, the line, column and snippet that
 Anything the scanner could not verify is reported as a **coverage gap**. A blocking gap can
 never lead to APPROVE: an unknown result is not treated as safe.
 
-> Status: v0.1.0, an alpha reference implementation. It is tested on Windows and Linux with real Go
-> binaries in three object formats, an ASAR archive packed by the official `@electron/asar` tool and
-> the live OSV API. The results are static, version-level evidence, not proof of exploitability.
+> Status: [v0.1.0](https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.1.0),
+> an alpha release listed on the
+> [GitHub Marketplace](https://github.com/marketplace/actions/software-intake-gatekeeper). The CLI is
+> tested on Windows and Linux with real Go binaries in three object formats, an ASAR archive packed
+> by the official `@electron/asar` tool and the live OSV API; the action also runs on macOS. The
+> results are static, version-level evidence, not proof of exploitability.
 
 ## Where it helps
 
@@ -35,11 +38,25 @@ never lead to APPROVE: an unknown result is not treated as safe.
 
 ## Quick start
 
+Install the released wheel (Python 3.11+). Optionally verify its build provenance first:
+
+```powershell
+gh release download v0.1.0 -R Sushant-Nemade/software-intake-gatekeeper -p "*.whl"
+gh attestation verify software_intake_gatekeeper-0.1.0-py3-none-any.whl -R Sushant-Nemade/software-intake-gatekeeper
+python -m pip install software_intake_gatekeeper-0.1.0-py3-none-any.whl
+```
+
+Or install from a clone (needed for the demo below):
+
 ```powershell
 git clone https://github.com/Sushant-Nemade/software-intake-gatekeeper
 cd software-intake-gatekeeper
 python -m pip install .
+```
 
+Then scan:
+
+```powershell
 # Offline inventory and Electron checks (no network):
 intake-gatekeeper scan "C:\Program Files\SomeApp"
 
