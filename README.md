@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/Sushant-Nemade/software-intake-gatekeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/Sushant-Nemade/software-intake-gatekeeper/actions/workflows/ci.yml)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Software%20Intake%20Gatekeeper-blue?logo=github)](https://github.com/marketplace/actions/software-intake-gatekeeper)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/software-intake-gatekeeper)](https://pypi.org/project/software-intake-gatekeeper/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/LICENSE)
 
 **Before you install, approve or ship a third-party app, find out what is inside it.**
 
@@ -22,8 +23,8 @@ Every finding names the file and, for scripts, the line, column and snippet that
 Anything the scanner could not verify is reported as a **coverage gap**. A blocking gap can
 never lead to APPROVE: an unknown result is not treated as safe.
 
-> Status: [v0.2.0](https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.0),
-> an alpha release listed on the
+> Status: [v0.2.1](https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.1),
+> an alpha release on [PyPI](https://pypi.org/project/software-intake-gatekeeper/) and the
 > [GitHub Marketplace](https://github.com/marketplace/actions/software-intake-gatekeeper). The CLI is
 > tested on Windows and Linux with real Go binaries in three object formats, an ASAR archive packed
 > by the official `@electron/asar` tool and the live OSV API; the action also runs on macOS. The
@@ -44,12 +45,18 @@ what is **inside** an app; the inspector checks which personal data the app **se
 
 ## Quick start
 
-Install the released wheel (Python 3.11+). Optionally verify its build provenance first:
+Install from [PyPI](https://pypi.org/project/software-intake-gatekeeper/) (Python 3.11+):
 
 ```powershell
-gh release download v0.2.0 -R Sushant-Nemade/software-intake-gatekeeper -p "*.whl"
-gh attestation verify software_intake_gatekeeper-0.2.0-py3-none-any.whl -R Sushant-Nemade/software-intake-gatekeeper
-python -m pip install software_intake_gatekeeper-0.2.0-py3-none-any.whl
+python -m pip install software-intake-gatekeeper
+```
+
+To verify build provenance first, install the wheel from the GitHub release instead:
+
+```powershell
+gh release download v0.2.1 -R Sushant-Nemade/software-intake-gatekeeper -p "*.whl"
+gh attestation verify software_intake_gatekeeper-0.2.1-py3-none-any.whl -R Sushant-Nemade/software-intake-gatekeeper
+python -m pip install software_intake_gatekeeper-0.2.1-py3-none-any.whl
 ```
 
 Or install from a clone (needed for the demo below):
@@ -120,7 +127,7 @@ intake-gatekeeper diff examples/update-demo/v1 examples/update-demo/v2 --osv `
   --json reports/update.json --markdown reports/update.md --sarif reports/update.sarif
 ```
 
-Real output for the fictional [update demo](examples/update-demo) (2026-10-14, live OSV). Version 2
+Real output for the fictional [update demo](https://github.com/Sushant-Nemade/software-intake-gatekeeper/tree/main/examples/update-demo) (2026-10-14, live OSV). Version 2
 fixes a `nodeIntegration` setting and upgrades lodash, but adds axios 0.21.1, a telemetry endpoint and
 a native module:
 
@@ -213,7 +220,7 @@ GHSA aliases. Advisories that no database rates (common for Go) are treated as
 
 ### Policy
 
-See [examples/intake-policy.toml](examples/intake-policy.toml). Unknown keys are rejected. Every waiver
+See [examples/intake-policy.toml](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/examples/intake-policy.toml). Unknown keys are rejected. Every waiver
 needs an id or alias, a written reason and an expiry date, and may be limited to one package URL.
 Expired or unused waivers are reported.
 
@@ -267,7 +274,7 @@ For supply-chain hardening, pin the action to the full commit SHA of a release i
 | `path` | (required) | Installed app directory, `.asar` archive or executable to scan. |
 | `compare-to` | `""` | Previous version of the same app. When set, the action runs the update check and gates on what the update adds. |
 | `osv` | `true` | Look up known vulnerabilities on OSV.dev. Sends only ecosystem, name and version. Set `false` for fully offline runs. |
-| `policy` | `""` | Path to a policy TOML file (see [examples/intake-policy.toml](examples/intake-policy.toml)). |
+| `policy` | `""` | Path to a policy TOML file (see [examples/intake-policy.toml](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/examples/intake-policy.toml)). |
 | `fail-on` | `reject` | Decision that fails the step: `reject`, `review` or `never`. |
 | `output-dir` | `intake-gatekeeper-reports` | Where `report.json`, `report.sarif`, `sbom.cdx.json` and `summary.md` are written. |
 
@@ -286,7 +293,7 @@ interpolated into shell code. No token or secret is required.
 
 ### Versioning
 
-Releases follow [Semantic Versioning](https://semver.org/) and are listed in [CHANGELOG.md](CHANGELOG.md).
+Releases follow [Semantic Versioning](https://semver.org/) and are listed in [CHANGELOG.md](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/CHANGELOG.md).
 `v0` always points to the latest `v0.x.y` release. Release artifacts carry
 [build provenance attestations](https://github.com/Sushant-Nemade/software-intake-gatekeeper/attestations)
 and a `SHA256SUMS` file.
@@ -357,4 +364,4 @@ The idea came from studying evidence-first reverse-engineering tools, which show
 every conclusion and state what they could not determine. This project applies that approach to
 software intake. All code here is original; no third-party tool source is included.
 
-[MIT](LICENSE) © 2026 Sushant Nemade. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+[MIT](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/LICENSE) © 2026 Sushant Nemade. See [SECURITY.md](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/SECURITY.md) for vulnerability reporting.

@@ -3,6 +3,17 @@
 All notable changes are recorded here. The project follows [Semantic Versioning](https://semver.org/);
 while the major version is 0, minor releases may change behaviour.
 
+## [0.2.1] - 2026-10-15
+
+### Added
+
+- Published on PyPI: `python -m pip install software-intake-gatekeeper`. Releases are uploaded by
+  the release workflow through PyPI trusted publishing, without a stored token.
+
+### Changed
+
+- README links are absolute so they also work on the PyPI project page.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added
@@ -41,5 +52,6 @@ First public release and first GitHub Marketplace listing.
 - No Rust `cargo auditable`, Python wheel, Java or native C/C++ inventories yet.
 - Electron code rules detect literal settings only.
 
+[0.2.1]: https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Sushant-Nemade/software-intake-gatekeeper/releases/tag/v0.1.0

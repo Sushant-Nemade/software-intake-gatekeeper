@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "software-intake-gatekeeper"
-version = "0.2.0"
+version = "0.2.1"
 description = "Local, evidence-first intake checks for third-party apps and binaries: SBOM, known vulnerabilities and Electron hardening."
 readme = "README.md"
 license = "MIT"
@@ -47,7 +47,10 @@ intake-gatekeeper = "intake_gatekeeper.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/Sushant-Nemade/software-intake-gatekeeper"
+Source = "https://github.com/Sushant-Nemade/software-intake-gatekeeper"
+Changelog = "https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Sushant-Nemade/software-intake-gatekeeper/issues"
+"GitHub Marketplace" = "https://github.com/marketplace/actions/software-intake-gatekeeper"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/intake_gatekeeper"]
