@@ -92,7 +92,9 @@ jobs:
         working-directory: examples/rust-demo
         run: |
           cargo auditable build --release --locked
-          binary="$PWD/target/release/rust-demo$([ "$RUNNER_OS" = Windows ] && echo .exe)"
+          suffix=""
+          if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; fi
+          binary="$PWD/target/release/rust-demo$suffix"
           rust-audit-info "$binary" > "$RUNNER_TEMP/audit.json"
           echo "INTAKE_RUST_BINARY=$binary" >> "$GITHUB_ENV"
           echo "INTAKE_RUST_AUDIT_JSON=$RUNNER_TEMP/audit.json" >> "$GITHUB_ENV"
