@@ -306,6 +306,29 @@ dependencies into a private virtual environment under `RUNNER_TEMP`, so it does 
 job's Python. Inputs reach the script only through environment variables and are never
 interpolated into shell code. No token or secret is required.
 
+### Use it together with Privacy Flow Inspector
+
+One job can check both **what is inside** an app and **what it sends out**: build or unpack the
+app, run your Playwright tests to record HAR files, then run both actions and gate on both
+decisions. The [toolkit workflow](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/.github/workflows/toolkit.yml)
+runs this with the published actions against both fictional demos.
+
+```yaml
+      - name: What is inside the app
+        id: inside
+        uses: Sushant-Nemade/software-intake-gatekeeper@v0
+        with: { path: dist/app, fail-on: never, output-dir: trust-reports/inside }
+      - name: What the app sends out
+        id: sends
+        uses: Sushant-Nemade/privacy-flow-inspector@v0
+        with: { har: "test-results/**/*.har", config: .github/pfi.toml, fail-on: never, output-dir: trust-reports/sends }
+      - name: Trust gate
+        env:
+          INSIDE: ${{ steps.inside.outputs.decision }}
+          SENDS: ${{ steps.sends.outputs.decision }}
+        run: '[ "$INSIDE" != reject ] && [ "$SENDS" != reject ]'
+```
+
 ### Versioning
 
 Releases follow [Semantic Versioning](https://semver.org/) and are listed in [CHANGELOG.md](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/CHANGELOG.md).
