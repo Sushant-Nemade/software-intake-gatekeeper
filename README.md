@@ -349,6 +349,9 @@ and a `SHA256SUMS` file.
 
 ## Verification
 
+The [real-world case study](https://github.com/Sushant-Nemade/software-intake-gatekeeper/blob/main/docs/real-world-case-study.md)
+describes the tests on real software and the fixes they led to.
+
 | Check | How |
 |---|---|
 | Go build info decoding | Compared with `go version -m` on real binaries built in CI for Windows PE, Linux ELF and macOS Mach-O |
